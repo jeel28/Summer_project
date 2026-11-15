@@ -21,6 +21,7 @@ __pycache__/
 *.csv
 *.png
 *.pdf
+*.pptx
 *.zip
 *.tar
 *.gz
