@@ -1,0 +1,39 @@
+# OS files
+.DS_Store
+
+# editor / local tooling
+.claude/
+.vscode/
+
+# Python cache / compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+
+# Project-generated artifacts / large outputs
+*.log
+*.pkl
+*.pickle
+*.csv
+*.png
+*.pdf
+*.zip
+*.tar
+*.gz
+*.bz2
+
+# Local data folders (keep code only)
+data/
+raw_data/
+results/
+out/
+
+# If you want to keep the main code but omit large generated outputs, uncomment the lines below:
+# MTP_longterm_fairness/yellow_tripdata_2016-03.csv
+# MTP_longterm_fairness/fig4_time_horizon_stability.png
+# MTP_longterm_fairness/*.pkl
+# MTP_longterm_fairness/*.log
