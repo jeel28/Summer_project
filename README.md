@@ -18,12 +18,15 @@ The repository contains:
 ## Folder Structure
 
 - `MTP_longterm_fairness/`
-  - `long_term_fairness_momaql.py` : paper-style MOMAQL reproduction
-  - `paper_reproduction_greedy_momaql.py` : compact reproduction with greedy + proposed + adaptive method
-  - `adaptive_fairness.py` : adaptive fairness extension
-  - `all_methods_runner.py` : runner for comparing methods
-  - `ADAPTIVE_FAIRNESS_DETAILED_SUMMARY.md` : detailed summary of the method and formulas
-  - other utility scripts for preprocessing and plotting
+  - `long_term_fairness_momaql.py` : data pipeline, MLP predictor, MOMAQL and greedy (paper reproduction)
+  - `adaptive_fairness.py` : adaptive fairness extension (component switches, optional hard bound, adaptive greedy)
+  - `run_experiments.py` : multi-seed comparison, ablation and lambda sweep (writes `results/`)
+  - `all_methods_runner.py` : command-line runner for the individual methods
+  - `paper_reproduction_greedy_momaql.py` : compact script that also produces the time-horizon plot
+  - `results/` : result CSVs and plots used in the presentation
+  - `ADAPTIVE_FAIRNESS_DETAILED_SUMMARY.md` : formulas, worked example and measured results
+  - `_make_plots.py`, `_depth_test.py`, `long_term_fairness_python_impl.py`, `run_no_bound.txt` : earlier iteration, kept for reference (not used by the experiments below)
+- `Adaptive_Fairness_Final_Presentation.pptx` : final presentation
 
 ## Installation
 
@@ -33,19 +36,32 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Run the project
+## Data
 
-From the project root:
+Download NYC Yellow Taxi trip data for March 2016 (`yellow_tripdata_2016-03.csv`, about 1.9 GB) and place it in `MTP_longterm_fairness/`. It is not stored in this repository.
 
-```bash
-python3 MTP_longterm_fairness/all_methods_runner.py --method all --data MTP_longterm_fairness/yellow_tripdata_2016-03.csv --drivers 20 --max-nodes 120 --peak-hours 2 --train-sample 0.05
-```
+## Run the experiments
 
-Or run the compact reproduction script:
+From `MTP_longterm_fairness/`:
 
 ```bash
-python3 MTP_longterm_fairness/paper_reproduction_greedy_momaql.py --data MTP_longterm_fairness/yellow_tripdata_2016-03.csv --drivers 20 --max-nodes 120 --peak-hours 2 --train-sample 0.05
+python3 run_experiments.py prepare              # once: load data, build graph, train predictor (~35 s)
+python3 run_experiments.py seeds --seeds 5      # greedy / adaptive greedy / MOMAQL / adaptive MOMAQL
+python3 run_experiments.py ablation --seeds 3   # which part of the adaptive weight helps
+python3 run_experiments.py pareto --seeds 2     # lambda sweep
 ```
+
+One learning run takes about 40-70 s. To run in parallel, start several shells with `--shard k/N` (for example `--shard 0/4` ... `--shard 3/4`) and merge the `*_shard*.csv` files.
+
+## Results (lambda = 1, mean over 5 seeds)
+
+| Method | Total utility | Variance | Std/mean |
+|---|---|---|---|
+| Greedy | 101,838 | 38 | 0.001 |
+| MOMAQL (paper) | 94,645 | 79,456 | 0.059 |
+| Adaptive MOMAQL | 97,853 | 2,991 | 0.011 |
+
+The paper's greedy numbers are not reproduced: the paper does not publish the graph size, driver count, MLP width, learning rate, epsilon, seed or shortest-path library, so only the definitions and the protocol are replicated. Our MOMAQL is close to the paper's (95,824 / 85,194 / 0.0610). A fixed-lambda MOMAQL with lambda about 10 matches or beats the adaptive method at lambda = 1, so part of the gain comes from a larger effective lambda. See the summary document for details.
 
 ## Key idea
 

@@ -43,6 +43,10 @@ class AdaptiveFairnessMOMAQL(base.MOMAQL):
         imbalance_scale=1.5,
         uncertainty_scale=0.8,
         demand_scale=0.6,
+        fairness_bound=None,
+        use_driver=True,
+        use_local=True,
+        use_unc=True,
     ):
         super().__init__(
             nodes=nodes,
@@ -61,6 +65,14 @@ class AdaptiveFairnessMOMAQL(base.MOMAQL):
         self.imbalance_scale = imbalance_scale
         self.uncertainty_scale = uncertainty_scale
         self.demand_scale = demand_scale
+        # Optional hard bound on projected Var(U); None = soft penalty only.
+        self.fairness_bound = fairness_bound
+        self.bound_enforced_count = 0   # steps where a bound-feasible driver existed
+        self.bound_violation_count = 0  # steps with no feasible driver (fallback)
+        # Component switches (for the ablation study).
+        self.use_driver = use_driver
+        self.use_local = use_local
+        self.use_unc = use_unc
 
         self.node_demand = defaultdict(float)
         for (pu, do), cnt in self.pair_counts.items():
@@ -95,8 +107,13 @@ class AdaptiveFairnessMOMAQL(base.MOMAQL):
         local_imb = self._local_demand_imbalance(pu, do)
         uncertainty = self._pair_uncertainty(pu, do)
 
-        coeff = 1.0 + self.imbalance_scale * driver_imb + self.demand_scale * local_imb
-        coeff *= 1.0 + (1.0 - uncertainty) * self.uncertainty_scale
+        coeff = 1.0
+        if self.use_driver:
+            coeff += self.imbalance_scale * driver_imb
+        if self.use_local:
+            coeff += self.demand_scale * local_imb
+        if self.use_unc:
+            coeff *= 1.0 + (1.0 - uncertainty) * self.uncertainty_scale
         return float(self.lam * coeff)
 
     def _projected_variance(self, d: int, r: float) -> float:
@@ -104,20 +121,28 @@ class AdaptiveFairnessMOMAQL(base.MOMAQL):
 
     def choose(self, pu, do, od_km, training):
         lam_t = self.adaptive_lambda(pu, do)
-        best_d, best_s = 0, -1e18
+        scores, proj = [], []
         for d in range(self.n):
             r = self.reward(d, pu, do, od_km)
-            fair_pen = lam_t * self.omega * self.fair_scale * self._marginal_var(d, r)
-            s = r - fair_pen + self.q_weight * self.Q[(self.driver_node[d], pu, do)]
-            if s > best_s:
-                best_s = s
-                best_d = d
+            mv = self._marginal_var(d, r)
+            fair_pen = lam_t * self.omega * self.fair_scale * mv
+            scores.append(r - fair_pen + self.q_weight * self.Q[(self.driver_node[d], pu, do)])
+            proj.append(self.util.var() + mv)
+
+        if self.fairness_bound is not None:
+            feasible = [d for d in range(self.n) if proj[d] <= self.fairness_bound]
+            if feasible:
+                self.bound_enforced_count += 1
+                best_d = max(feasible, key=lambda d: scores[d])
+            else:  # no driver keeps Var(U) within the bound: pick the least-violating
+                self.bound_violation_count += 1
+                best_d = int(np.argmin(proj))
+        else:
+            best_d = int(np.argmax(scores))
 
         if training and self.rng.random() < self.epsilon:
             # epsilon-greedy exploration for the adaptive fairness objective.
-            idx = int(self.rng.integers(0, self.n))
-            return idx
-
+            return int(self.rng.integers(0, self.n))
         return best_d
 
     def step(self, pu, do, od_km, training):
@@ -143,6 +168,28 @@ class AdaptiveFairnessMOMAQL(base.MOMAQL):
         self.Q.clear()
         for k, v in q_loaded.items():
             self.Q[tuple(k)] = float(v)
+
+class AdaptiveGreedy(base.GreedyEq3):
+    """Greedy (Eq. 3) whose fairness weight lambda_t adapts to the driver imbalance."""
+
+    def __init__(self, *args, imbalance_scale=1.5, **kw):
+        super().__init__(*args, **kw)
+        self.imbalance_scale = imbalance_scale
+
+    def choose(self, pu, do, od_km, training=False):
+        u = self.util
+        mean = float(np.mean(u))
+        imb = float(np.std(u) / abs(mean)) if abs(mean) > 1e-12 else 0.0
+        lam_t = self.lam * (1.0 + self.imbalance_scale * imb)
+        base_var = u.var()
+        best_d, best_s = 0, -1e18
+        for d in range(self.n):
+            r = self.reward(d, pu, do, od_km)
+            s = r - lam_t * (base_var + self._marginal_var(d, r))
+            if s > best_s:
+                best_s, best_d = s, d
+        return best_d
+
 
 def build_pair_counts(train: pd.DataFrame) -> Dict[Tuple[str, str], int]:
     counts = train.groupby(["pu", "do"]).size().to_dict()

@@ -30,7 +30,7 @@ __pycache__/
 # Local data folders (keep code only)
 data/
 raw_data/
-results/
+/results/
 out/
 
 # If you want to keep the main code but omit large generated outputs, uncomment the lines below:
@@ -38,3 +38,17 @@ out/
 # MTP_longterm_fairness/fig4_time_horizon_stability.png
 # MTP_longterm_fairness/*.pkl
 # MTP_longterm_fairness/*.log
+
+# --- exceptions: results, plots and the final deck ARE tracked ---
+!MTP_longterm_fairness/results/
+!MTP_longterm_fairness/results/*.csv
+!MTP_longterm_fairness/results/plots/
+!MTP_longterm_fairness/results/plots/*.png
+!MTP_longterm_fairness/fig4_time_horizon_stability.png
+!Adaptive_Fairness_Final_Presentation.pptx
+
+# still ignored: per-shard temp files, run logs, Office lock files, the 1.9 GB dataset
+MTP_longterm_fairness/results/*_shard*.csv
+MTP_longterm_fairness/results/log_*.txt
+MTP_longterm_fairness/yellow_tripdata_2016-03.csv
+~$*

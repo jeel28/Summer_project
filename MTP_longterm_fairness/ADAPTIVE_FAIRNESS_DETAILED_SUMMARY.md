@@ -279,8 +279,8 @@ c_B = 1 + 0.8 · (1 - I_unc)
 
 **Step 1: Compute I_driver**
 - mean(U) = (100 + 50 + 200)/3 = 116.67
-- std(U) = sqrt([(100-116.67)² + (50-116.67)² + (200-116.67)²]/3) = 61.10
-- I_driver = 61.10 / 116.67 = 0.524
+- std(U) = sqrt([(100-116.67)² + (50-116.67)² + (200-116.67)²]/3) = 62.36
+- I_driver = 62.36 / 116.67 = 0.535
 
 **Step 2: Compute I_local**
 - max(150, 120) / 100 = 1.5
@@ -290,14 +290,14 @@ c_B = 1 + 0.8 · (1 - I_unc)
 - I_unc = 1/sqrt(10 + 1) = 1/sqrt(11) = 0.301
 
 **Step 4: Compute Coefficients**
-- c_A = 1 + 1.5(0.524) + 0.6(0.5) = 1 + 0.786 + 0.3 = 2.086
-- c_B = 1 + 0.8(1 - 0.301) = 1 + 0.8(0.699) = 1.559
-- c = 2.086 × 1.559 = 3.252
+- c_A = 1 + 1.5(0.535) + 0.6(0.5) = 1 + 0.802 + 0.3 = 2.102
+- c_B = 1 + 0.8(1 - 0.302) = 1.559
+- c = 2.102 × 1.559 = 3.276
 
 **Step 5: Compute λ_t**
-- λ_t = 1.0 × 3.252 = 3.252
+- λ_t = 1.0 × 3.276 = 3.28
 
-**Interpretation**: The fairness weight is increased by 3.25x because:
+**Interpretation**: The fairness weight is increased by 3.28x because:
 - The system is imbalanced (drivers have very different utilities)
 - This region is a hot spot (pickup node has high demand)
 - The pair is fairly well-observed (not rare, but not extremely common)
@@ -321,10 +321,10 @@ Assume:
 
 **Result**: Chooses Driver 1 (highest reward, barely penalized for fairness)
 
-**Adaptive Fairness (λ_t = 3.252):**
-- score(1) = 12 - 3.252 × 0.6 × 0.046 × 0.05 = 12.0 - 0.0045 ≈ 11.996
-- score(2) = 10 - 3.252 × 0.6 × 0.046 × 0.15 = 10.0 - 0.0134 ≈ 9.987
-- score(3) = 9 - 3.252 × 0.6 × 0.046 × 0.35 = 9.0 - 0.0313 ≈ 8.969
+**Adaptive Fairness (λ_t = 3.28):**
+- score(1) = 12 - 3.28 × 0.6 × 0.046 × 0.05 = 12.0 - 0.0045 ≈ 11.996
+- score(2) = 10 - 3.28 × 0.6 × 0.046 × 0.15 = 10.0 - 0.0134 ≈ 9.987
+- score(3) = 9 - 3.28 × 0.6 × 0.046 × 0.35 = 9.0 - 0.0313 ≈ 8.969
 
 **Result**: Still chooses Driver 1, BUT the fairness penalty is now 3x stronger.
 
@@ -337,9 +337,9 @@ Assume:
 ### When System is BALANCED
 - I_driver ≈ 0, I_local ≈ 0, I_unc ≈ 0.1
 - λ_t = 1.0 × [1 + 0 + 0] × [1 + 0.72] ≈ 1.72
-- **Effect**: Fairness weight reduced to ~1.72x baseline
-- **Behavior**: Prioritizes utility over fairness
-- **Rationale**: System is already fair, no need for strong fairness enforcement
+- **Effect**: Fairness weight is ~1.72x baseline (the coefficient is never below 1, so λ_t is never smaller than λ)
+- **Behavior**: Mild fairness pressure; the weight is only *lower relative to the imbalanced case*, not lower than the paper's λ
+- **Rationale**: System is already fair, so little extra pressure is added
 
 ### When System is IMBALANCED
 - I_driver ≈ 1.0, I_local ≈ 0.5, I_unc ≈ 0.3
@@ -491,3 +491,22 @@ Fhat = std(U) / mean(U)
 ---
 
 END OF SUMMARY
+
+
+---
+
+## UPDATE: MEASURED RESULTS (replaces the 'Expected Results' above)
+
+Run with `MTP_longterm_fairness/run_experiments.py`; raw numbers in `MTP_longterm_fairness/results/*.csv`.
+Seeds change only the agent (start positions, exploration); data split and predictor are fixed.
+
+| Method (λ=1, 5 seeds) | Total utility | Variance | Std/mean |
+|---|---|---|---|
+| Greedy | 101,838 ± 144 | 38 ± 43 | 0.001 |
+| Adaptive greedy | 101,749 ± 49 | 38 ± 49 | 0.001 |
+| MOMAQL (paper) | 94,645 ± 680 | 79,456 ± 13,342 | 0.059 |
+| Adaptive MOMAQL | 97,853 ± 535 | 2,991 ± 712 | 0.011 |
+
+- Paper's Table 1 numbers for greedy are NOT reproduced (the paper does not publish graph size, driver count, MLP width, learning rate, epsilon, seed, shortest-path library). Our MOMAQL is close to the paper's (95,824 / 85,194 / 0.0610).
+- Ablation (3 seeds): all three components together are best; local demand helps most.
+- Lambda sweep (2 seeds): a fixed-lambda MOMAQL with lambda about 10 matches or beats adaptive at lambda=1, so part of the gain is a larger effective lambda. Adaptive over-penalises at base lambda >= 25.
