@@ -61,6 +61,32 @@ One learning run takes about 40-70 s. To run in parallel, start several shells w
 | MOMAQL (paper) | 94,645 | 79,456 | 0.059 |
 | Adaptive MOMAQL | 97,853 | 2,991 | 0.011 |
 
+### Ablation (3 seeds): which part of the adaptive weight helps
+
+| Variant | Total utility | Variance |
+|---|---|---|
+| None (fixed lambda) | 94,810 | 73,455 |
+| Driver imbalance only | 95,782 | 67,582 |
+| Uncertainty only | 95,371 | 36,009 |
+| Local demand only | 97,156 | 10,276 |
+| Driver + local | 97,531 | 9,298 |
+| All three | 98,058 | 3,118 |
+
+### Lambda sweep (2 seeds)
+
+| Base lambda | Fixed: utility | Fixed: variance | Adaptive: utility | Adaptive: variance |
+|---|---|---|---|---|
+| 0 | 76,875 | 8,544,214 | 76,875 | 8,544,214 |
+| 0.5 | 92,648 | 217,553 | 96,238 | 13,181 |
+| 1 | 95,043 | 79,510 | 98,296 | 2,561 |
+| 2 | 96,690 | 26,177 | 100,258 | 572 |
+| 5 | 99,878 | 4,066 | 101,254 | 115 |
+| 10 | 101,386 | 902 | 101,271 | 16 |
+| 25 | 102,520 | 188 | 94,039 | 8 |
+| 50 | 101,950 | 26 | 80,869 | 2 |
+
+At lambda = 0 both methods are identical, which checks the code. Seeds change only the agent (start positions, exploration); the data split, graph and predictor are fixed. Plots are in `MTP_longterm_fairness/results/plots/`, raw numbers in `MTP_longterm_fairness/results/*.csv`.
+
 The paper's greedy numbers are not reproduced: the paper does not publish the graph size, driver count, MLP width, learning rate, epsilon, seed or shortest-path library, so only the definitions and the protocol are replicated. Our MOMAQL is close to the paper's (95,824 / 85,194 / 0.0610). A fixed-lambda MOMAQL with lambda about 10 matches or beats the adaptive method at lambda = 1, so part of the gain comes from a larger effective lambda. See the summary document for details.
 
 ## Key idea
